@@ -1,0 +1,36 @@
+#!/usr/bin/bash
+
+LOCKD="/etc/lockd"
+
+help() {
+	echo "Commands: install, uninstall"
+}
+
+
+if [ ! -n "$1" ]; then
+	echo "Missing argument"
+	help
+	exit 1
+fi
+
+if [ $1 == "install" ]; then
+
+	sudo mkdir -p "$LOCKD/"{profiles,stores}
+	sudo cp src/{lockd,run} "$LOCKD"
+
+	sudo chmod 0755 "$LOCKD"
+	sudo chmod 0755 "$LOCKD/profiles"
+	sudo chmod 0700 "$LOCKD/stores"
+	sudo chmod 4755 "$LOCKD/lockd"
+	sudo chmod 0744 "$LOCKD/run"
+
+	sudo rm /usr/bin/lockd &2> /dev/null
+	sudo ln -s "$LOCKD/lockd" /usr/bin/lockd
+
+elif [ $1 == "uninstall" ]; then
+	sudo rm /usr/bin/lockd
+	sudo rm -r $LOCKD
+else
+	help
+	exit 1
+fi

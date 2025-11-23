@@ -1,0 +1,57 @@
+#!/usr/bin/bash
+set -e
+
+COMMAND="$1"
+
+run_profile() {
+	local profile="$1"
+
+	local store
+	local mount
+	local run
+	local user="$USER"
+
+	if [ ! -n "$profile" ]; then
+	    echo "No profile specified"
+	    exit 1
+	fi
+
+	if [ ! -f "/etc/lockd/profiles/$profile" ]; then
+	    echo "No profile found: profiles/$profile"
+	    exit 1
+	fi
+
+	# honestly I don't care what the user does
+	# as long as we import the right variables
+	source "/etc/lockd/profiles/$profile"
+
+	#echo "$file"
+	#echo "$mount"
+	#echo "$run"
+	#echo "$user"
+
+	if [ ! -n "$store" ]; then
+	    echo "Error in profile: missing: store"
+	    exit 1
+	fi
+
+	if [ ! -n "$mount" ]; then
+	    echo "Error in profile: missing: mount"
+	    exit 1
+	fi
+
+	if [ ! -n "$run" ]; then
+	    echo "Error in profile: missing: run"
+	    exit 1
+	fi
+
+	sudo unshare -m /etc/lockd/run "$user" "/etc/lockd/stores/$store" "$mount" "$run"
+}
+
+if [ "$COMMAND" == "run" ]; then
+    run_profile "$2"
+else
+    echo "Unknown command $COMMAND"
+    echo "Commands: run"
+    exit 1
+fi 

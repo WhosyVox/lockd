@@ -1,0 +1,18 @@
+Milestones
+
+[x] Test this setup works
+[x] Can be run without sudo
+[x] Support multiple apps/profiles
+[ ] Github repo
+[x] Readme
+[ ] Can create/manage stores
+[ ] Profile management gui/tui
+[ ] --help
+[x] Install script
+[x] Uninstall script
+[ ] Man/info pages
+[ ] Packaging
+
+Other tasks
+[ ] See if profiles can support variables like $USER
+[ ] See if anyone I know can help with above

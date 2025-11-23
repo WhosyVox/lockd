@@ -1,0 +1,5 @@
+How I created my initial store:
+
+sudo dd if=/dev/zero of=/etc/lockd/store/whosy-firefox bs=1G count=2
+sudo chmod 0700 /etc/lockd/store/whosy-firefox
+sudo mkfs.ext4 /etc/lockd/store/whosy-firefox

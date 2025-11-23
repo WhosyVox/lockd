@@ -1,0 +1,3 @@
+store="whosy-firefox"
+mount="/home/whosy/.mozilla/firefox"
+run="/usr/bin/firefox"
