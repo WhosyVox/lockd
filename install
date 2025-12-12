@@ -2,7 +2,7 @@
 set -e
 
 help() {
-	echo "Commands: install, uninstall"
+	echo "Commands: install, uninstall, purge"
 }
 
 
@@ -22,10 +22,12 @@ if [ $1 == "install" ]; then
 	sudo chmod 4755 "/usr/bin/lockd"
 
 	sudo chmod 0755 "/etc/lockd"
-	sudo chmod 0755 "/etc/lockd/profiles"
+	sudo chmod 0744 "/etc/lockd/profiles"
 	sudo chmod 0700 "/etc/lockd/stores"
 
 elif [ $1 == "uninstall" ]; then
+	sudo rm "/usr/bin/lockd"
+elif [ $1 == "purge" ]; then
 	sudo rm "/usr/bin/lockd"
 	sudo rm -r "/etc/lockd"
 else
