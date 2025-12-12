@@ -1,5 +1,0 @@
-#!/usr/bin/env bash
-rm -f a.out
-gcc main.c profile.c stringutils.c opt_suid.c -o a.out
-sudo chown root:root a.out
-sudo chmod 4755 a.out
