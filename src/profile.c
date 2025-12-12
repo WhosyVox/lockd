@@ -1,7 +1,11 @@
-#include "profile.h"
-#include "stringutils.h"
 #include <string.h>
 #include <stdlib.h>
+#include <stdio.h>
+#include <errno.h>
+
+#include "profile.h"
+#include "stringutils.h"
+#include "file_validation.h"
 
 int parse_keyvalue( char *line, keyvalue_t *keyvalue ) {
 	// strip trailing newlines from the input
@@ -66,6 +70,38 @@ int parse_profile( FILE *fp, profile_t *profile ) {
 	return 1;
 }
 
+int check_profile_permissions( char *profile_path ) {
+	int profile_valid = check_item( profile_path, 0744, is_file );
+	switch ( profile_valid ) {
+		case ITM_GOOD:
+			// cool
+		break;
+		case ITM_MISSING:
+			printf( "Unable to read %s: %s\n", profile_path, strerror( errno ) );
+			return 0;
+		break;
+		case ITM_BAD_TYPE:
+			printf( "Item %s exists but is not a file\n", profile_path );
+			return 0;
+		break;
+		case ITM_BAD_PERMISSIONS:
+			printf( "Incorrect permissions on %s: expected 744\n", profile_path );
+			return 0;
+		case ITM_BAD_OWNER:
+			printf( "Profile %s must be owned by root\n", profile_path );
+			return 0;
+		break;
+		default:
+			printf( "Unrecognised state %d on %s\n", profile_valid, profile_path );
+		break;
+	}
+	
+	return 1;
+}
+
+
+
+
 int load_profile( char *profile_name, profile_t *profile ) {
 	if ( !is_valid_filename( profile_name ) ) {
 		printf( "Cannot load %s: invalid file name/path\n", profile_name );
@@ -74,6 +110,13 @@ int load_profile( char *profile_name, profile_t *profile ) {
 
 	char *profile_file = concat( PROFILE_PATH, profile_name );
 	// printf( "%s\n", profile_file );
+
+	if ( check_profile_permissions( profile_file ) == 0 ) {
+		printf( "Profile file %s is not in a correct state. Exiting.\n", profile_file );
+		return 0;
+	}
+	
+	
 	
 	FILE *fp = fopen( profile_file, "r" );
 	if ( fp == NULL ) {
@@ -93,7 +136,6 @@ int load_profile( char *profile_name, profile_t *profile ) {
 	}
 }
 
-
 int validate_profile( profile_t *profile, char *user_name, char *user_home ) {
 
 	if ( !is_valid_app_path( profile->run ) ) {
@@ -103,6 +145,12 @@ int validate_profile( profile_t *profile, char *user_name, char *user_home ) {
 
 	if ( !is_valid_filename( profile->store ) ) {
 		printf( "store must be a path relative to the store directory (got %s)\n", profile->store );
+		return 0;
+	}
+
+	// TODO: better handling at excluding elipses
+	if ( strstr( profile->mount, ".." ) != NULL ) {
+		printf( "disallowing mount path containing '..'\n" );
 		return 0;
 	}
 

@@ -12,6 +12,8 @@
 #include <sched.h>
 #include <sys/types.h>
 
+#include <sys/stat.h>
+
 // #include <assert.h>
 // #include <stdint.h>
 
@@ -19,162 +21,85 @@
 #include "stringutils.h"
 
 #include "opt_suid.h"
+#include "opt_run.h"
+#include "opt_validate.h"
+#include "opt_help.h"
 
-#define STORE_PATH "/etc/lockd/stores/"
-
-
-int opt_run( char *profile_name, char *user_name, char *user_home ) {
-	profile_t profile = { NULL, NULL, NULL, NULL };
-	int loaded = load_profile( profile_name, &profile );
-	if ( !loaded ) {
-		printf( "Failed to load profile: %s\n", profile_name );
-		return 0;
-	}
-
-	if ( !validate_profile( &profile, user_name, user_home ) ) {
-		return 0;
-	}
-
-	// the uid and euid are still swapped
-	int user_id = geteuid();
-
-	extern char **environ;
-
-	char *full_store_path = concat( STORE_PATH, profile.store );
-
-	printf( "Full store path: %s\n", full_store_path );
-
-	// and drop to full root to execute
-	setreuid( 0, 0 );
-
-	// start a new mount-isolated namespace
-	int in_namespace = unshare( CLONE_NEWNS );
-	if ( in_namespace != 0 ) {
-		printf( "Unshare failed: %s\n", strerrorname_np( errno ) );
-		return 0;
-	}
-
-	// prevent namespace mount from leaking
-	int isolated = mount( "none", "/", NULL, MS_REC|MS_PRIVATE, NULL );
-	if ( isolated != 0 ) {
-		printf( "Failed to isolate namespace: %s\n", strerrorname_np( errno ) );
-		return 0;
-	}
-
-
-	//  1. create a loop device from full_store_path
-	//  2. mount the block device to profile.mount
-	// /3. Fork here
-	// /4. child: drop to normal user privileges setreuid( user_id, user_id )
-	// /5. child: exec to profile.run
-	// /6. parent: waits until child terminates
-	//  7. parent: then unmount filesystem
-	//  8. parent: unmount loop device
-
-	
-
-
-	/*
-	pid_t pid = fork();
-	if ( pid == -1 ) {
-		printf( "Failed to create child process: %s\n", strerrorname_np( errno ) );
-		return 0;
-	}
-	
-	if ( pid == 0 ) {
-		// child
-		setreuid( user_id, user_id );
-		// printf( "Child privileges: %i, %i\n", getuid(), geteuid() );
-		char** run_args = split_arguments( profile.run );
-		execve( run_args[0], run_args , environ );
-		return 1;
-	} else {
-		// parent
-		// printf( "Parent privileges: %i, %i\n", getuid(), geteuid() );
-
-		// wait for process to exit
-		int status;
-		do {
-			waitpid( pid, &status, WUNTRACED );
-			printf( "Exiting. Process has status code %i.\n", status );
-		} while ( !WIFEXITED( status ) && !WIFSIGNALED( status ) );
-
-
-		// todo: umount here
-
-		
-		return 1;
-	}
-	*/
-	
-
-
-	/*
-	char *args[] = {
-		"/etc/lockd/run",
-		user_name,
-		full_store_path,
-		profile.mount,
-		profile.run,
-		'\0'
-	};
-	execve( "/etc/lockd/run", args, environ );
-	*/
-
-	
-	return 1;
-}
-
-
-int opt_user( char *user_name ) {
-	printf( "Current user: %s\n", user_name );
-	return 1;
-}
-
-int opt_help() {
-	// TODO
-	printf( "No option selected.\n" );
-	return 1;
-}
-
-int opt_validate( char *profile_name, char *user_name, char *user_home ) {
-	profile_t profile = { NULL, NULL, NULL, NULL };
-	int loaded = load_profile( profile_name, &profile );
-	if ( !loaded ) {
-		printf( "Failed to load profile: %s\n", profile_name );
-		return 0;
-	}
-
-	if ( !validate_profile( &profile, user_name, user_home ) ) {
-		return 0;
-	}
-
-	printf( "Profile is valid for this user.\n" );
-
-	printf(
-		"Store=%s\nMount=%s\nRun=%s\nUser=%s\n",
-		profile.store,
-		profile.mount,
-		profile.run,
-		profile.user
-	 );
-
-	 return 1;
-}
-
-
-
-
+#include "file_validation.h"
 
 void drop_root() {
 	seteuid( getuid() );
 }
+
+int check_app_permissions() {
+	char profiles_path[] = "/etc/lockd/profiles";
+	char stores_path[] = "/etc/lockd/stores";
+
+	int profiles_valid = check_item( profiles_path, 0755, is_directory );
+
+	switch ( profiles_valid ) {
+		case ITM_GOOD:
+			// cool
+		break;
+		case ITM_MISSING:
+			printf( "Unable to read %s: %s\n", profiles_path, strerror( errno ) );
+			return 0;
+		break;
+		case ITM_BAD_TYPE:
+			printf( "Item %s exists but is not a directory\n", profiles_path );
+			return 0;
+		break;
+		case ITM_BAD_PERMISSIONS:
+			printf( "Incorrect permissions on %s: expected 755\n", profiles_path );
+			return 0;
+		break;
+		case ITM_BAD_OWNER:
+			printf( "Item %s must be owned by root\n", stores_path );
+			return 0;
+		default:
+			printf( "Unrecognised state %d on %s\n", profiles_valid, profiles_path );
+		break;
+	}
+
+	int stores_valid = check_item( stores_path, 0700, is_directory );
+	switch ( stores_valid ) {
+		case ITM_GOOD:
+			// cool
+		break;
+		case ITM_MISSING:
+			printf( "Unable to read %s: %s\n", stores_path, strerror( errno ) );
+			return 0;
+		break;
+		case ITM_BAD_TYPE:
+			printf( "Item %s exists but is not a directory\n", stores_path );
+			return 0;
+		break;
+		case ITM_BAD_PERMISSIONS:
+			printf( "Incorrect permissions on %s: expected 700\n", stores_path );
+			return 0;
+		break;
+		case ITM_BAD_OWNER:
+			printf( "Item %s must be owned by root\n", stores_path );
+			return 0;
+		default:
+			printf( "Unrecognised state %d on %s\n", stores_valid, stores_path );
+		break;
+	}
+
+	return 1;
+}
+
 
 
 int main( int argc, char **argv ) {
 	if ( argc < 2 ) {
 		drop_root();
 		return opt_help();
+	}
+
+	if ( check_app_permissions() == 0 ) {
+		printf( "Environment is not in a correct state. Exiting.\n" );
+		return 0;
 	}
 	
 	uid_t uid = getuid();
@@ -188,15 +113,9 @@ int main( int argc, char **argv ) {
 	char *user_name = pw->pw_name;
 	char *user_home = pw->pw_dir;
 
-	if ( user_name == NULL ) {
+	if ( user_name == NULL || user_home == NULL ) {
 		drop_root();
-		printf( "Could not determine user.\n" );
-		return opt_help();
-	}
-
-	if ( user_home == NULL ) {
-		drop_root();
-		printf( "Could not determine user's home.\n" );
+		printf( "Could not load user system information.\n" );
 		return opt_help();
 	}
 
@@ -216,54 +135,7 @@ int main( int argc, char **argv ) {
 			return 1;
 		}
 		char *profile_name = argv[2];
-		return !opt_validate( profile_name, user_name, user_home );
-	} else if ( strcmp( argv[1], "who") == 0 ) {
-		drop_root();
-		return !opt_user( user_name );
-	} else if ( strcmp( argv[1], "ns" ) == 0 ) {
-		// drop_root();
-
-		setuid( 0 );
-
-		
-		int in_namespace = unshare( CLONE_NEWNS );
-		if ( in_namespace != 0 ) {
-			printf( "Unshare failed: %s\n", strerrorname_np( errno ) );
-		}
-
-		// really?
-		mount( "none", "/", NULL, MS_REC|MS_PRIVATE, NULL );
-
-		int did_mount = system( "mount /etc/lockd/stores/whosy-firefox /home/whosy/.mozilla/firefox" );
-
-				/*
-		int did_mount = mount(
-			"/etc/lockd/stores/whosy-firefox",
-			"/home/whosy/.mozilla/firefox",
-			"ext4",
-			0, // MS_PRIVATE,
-			NULL
-		);
-		*/
-
-		if ( did_mount != 0 ) {
-			printf( "Failed to mount: %s\n",  strerrorname_np( errno ) );
-		}
-		
-		getchar();
-
-		int did_umount;
-		while ( 1 ) {
-			did_umount = system( "umount /home/whosy/.mozilla/firefox" );
-			// int did_umount = umount( "/home/whosy/.mozilla/firefox" );
-
-			if ( did_umount != 0 ) {
-				printf( "Failed to unmount: %s\n",  strerrorname_np( errno ) );
-				continue;
-			}
-			break;
-		}
-		
+		return !opt_validate( profile_name, user_name, user_home );	
 	} else {
 		drop_root();
 		return opt_help();

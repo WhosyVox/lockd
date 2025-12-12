@@ -20,5 +20,6 @@ typedef struct {
 int parse_keyvalue( char* line, keyvalue_t *keyvalue );
 
 int parse_profile( FILE *fp, profile_t *profile );
+int check_profile_permissions( char *profile_path );
 int load_profile( char *profile_name, profile_t *profile );
 int validate_profile( profile_t *profile, char *user_name, char *user_home );

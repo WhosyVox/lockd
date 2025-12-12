@@ -75,12 +75,6 @@ char** split_arguments( char *input ) {
 	} while ( token != NULL );
 	buffer[length] = '\0';
 
-	for ( int i = 0; i < length; i++ ) {
-		printf( "Arg %i: %s\n", i, buffer[i] );
-	}
-
-	printf( "Argument count: %i\n", length );
-
 	char** output = calloc( length + 1, sizeof( char* ) );
 	memcpy( output, buffer, length * sizeof( char* ) );
 	return output;

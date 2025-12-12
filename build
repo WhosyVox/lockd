@@ -1,0 +1,4 @@
+#!/usr/bin/env bash
+
+NAME=lockd
+gcc src/*.c -o out/$NAME

@@ -1,6 +1,5 @@
 #!/usr/bin/bash
-
-LOCKD="/etc/lockd"
+set -e
 
 help() {
 	echo "Commands: install, uninstall"
@@ -15,21 +14,20 @@ fi
 
 if [ $1 == "install" ]; then
 
-	sudo mkdir -p "$LOCKD/"{profiles,stores}
-	sudo cp src/{lockd,run} "$LOCKD"
+	sudo mkdir -p "/etc/lockd/"{profiles,stores}
 
-	sudo chmod 0755 "$LOCKD"
-	sudo chmod 0755 "$LOCKD/profiles"
-	sudo chmod 0700 "$LOCKD/stores"
-	sudo chmod 4755 "$LOCKD/lockd"
-	sudo chmod 0744 "$LOCKD/run"
+	sudo rm "/usr/bin/lockd" 2>/dev/null
+	sudo cp "out/lockd" "/usr/bin/lockd"
+	sudo chown root:root "/usr/bin/lockd"
+	sudo chmod 4755 "/usr/bin/lockd"
 
-	sudo rm /usr/bin/lockd &2> /dev/null
-	sudo ln -s "$LOCKD/lockd" /usr/bin/lockd
+	sudo chmod 0755 "/etc/lockd"
+	sudo chmod 0755 "/etc/lockd/profiles"
+	sudo chmod 0700 "/etc/lockd/stores"
 
 elif [ $1 == "uninstall" ]; then
-	sudo rm /usr/bin/lockd
-	sudo rm -r $LOCKD
+	sudo rm "/usr/bin/lockd"
+	sudo rm -r "/etc/lockd"
 else
 	help
 	exit 1
